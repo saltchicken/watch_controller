@@ -4,27 +4,32 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Arrangement
+// ‼️ Added imports for InteractionSource (needed to fix the crash)
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import androidx.wear.tooling.preview.devices.WearDevices
@@ -53,6 +58,7 @@ fun WearApp(greetingName: String) {
         fun sendToPython(message: String) {
             coroutineScope.launch(Dispatchers.IO) {
                 try {
+                    // ‼️ Check your IP
                     val socket = Socket("10.0.0.19", 5001)
                     val output = PrintWriter(socket.getOutputStream(), true)
                     output.println(message)
@@ -66,22 +72,17 @@ fun WearApp(greetingName: String) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colors.background)
+                .background(Color.Black)
                 .pointerInput(Unit) {
                     var offsetX = 0f
                     var offsetY = 0f
                     detectDragGestures(
                         onDragStart = { offsetX = 0f; offsetY = 0f },
                         onDragEnd = {
-                            val minSwipeDist = 20f
                             if (abs(offsetX) > abs(offsetY)) {
-                                if (abs(offsetX) > minSwipeDist) {
-                                    if (offsetX > 0) sendToPython("Swipe Right") else sendToPython("Swipe Left")
-                                }
+                                if (offsetX > 0) sendToPython("Swipe Right") else sendToPython("Swipe Left")
                             } else {
-                                if (abs(offsetY) > minSwipeDist) {
-                                    if (offsetY > 0) sendToPython("Swipe Down") else sendToPython("Swipe Up")
-                                }
+                                if (offsetY > 0) sendToPython("Swipe Down") else sendToPython("Swipe Up")
                             }
                         },
                         onDrag = { change, dragAmount ->
@@ -93,52 +94,90 @@ fun WearApp(greetingName: String) {
                 },
             contentAlignment = Alignment.Center
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                // Top: K (Up)
-                VimButton(text = "K", onClick = { sendToPython("k") })
+            // 1. UP ZONE (K)
+            InvisibleTouchArea(
+                text = "",
+                onClick = { sendToPython("k") },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth(0.6f)
+                    .height(80.dp),
+                shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
+            )
 
-                Spacer(modifier = Modifier.height(5.dp))
+            // 2. DOWN ZONE (J)
+            InvisibleTouchArea(
+                text = "",
+                onClick = { sendToPython("j") },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth(0.6f)
+                    .height(80.dp),
+                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+            )
 
-                // Middle: H (Left) and L (Right)
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    VimButton(text = "H", onClick = { sendToPython("h") })
-                    Spacer(modifier = Modifier.width(40.dp)) // Wider gap for the middle row
-                    VimButton(text = "L", onClick = { sendToPython("l") })
-                }
+            // 3. LEFT ZONE (H)
+            InvisibleTouchArea(
+                text = "",
+                onClick = { sendToPython("h") },
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .width(70.dp)
+                    .fillMaxHeight(0.5f),
+                shape = RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp)
+            )
 
-                Spacer(modifier = Modifier.height(5.dp))
+            // 4. RIGHT ZONE (L)
+            InvisibleTouchArea(
+                text = "",
+                onClick = { sendToPython("l") },
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .width(70.dp)
+                    .fillMaxHeight(0.5f),
+                shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp)
+            )
 
-                // Bottom: J (Down)
-                VimButton(text = "J", onClick = { sendToPython("j") })
-            }
+            // 5. MIDDLE ZONE (Action)
+            InvisibleTouchArea(
+                text = "",
+                onClick = { sendToPython("Button Pressed") },
+                modifier = Modifier
+                    .size(80.dp)
+                    .align(Alignment.Center),
+                shape = CircleShape
+            )
+
+            Text("", color = Color.Gray, style = MaterialTheme.typography.caption2)
         }
     }
 }
 
 @Composable
-fun VimButton(text: String, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier.size(50.dp) // Slightly smaller buttons to fit the diamond better
-    ) {
-        Text(text = text, style = MaterialTheme.typography.title2)
-    }
-}
+fun InvisibleTouchArea(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    shape: Shape
+) {
+    // ‼️ CRITICAL FIX: Create an interaction source
+    val interactionSource = remember { MutableInteractionSource() }
 
-@Composable
-fun Greeting(greetingName: String) {
-    Text(
-        modifier = Modifier.fillMaxWidth(),
-        textAlign = TextAlign.Center,
-        color = MaterialTheme.colors.primary,
-        text = "Hello $greetingName!"
-    )
+    Box(
+        modifier = modifier
+            .clip(shape)
+            // ‼️ FIX: Explicitly set indication to null to bypass the crash
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            // Debug Color: Set alpha to 0.0f to hide completely
+            .background(Color.White.copy(alpha = 0.1f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = text, color = Color.White.copy(alpha = 0.3f))
+    }
 }
 
 @Preview(device = WearDevices.SMALL_ROUND, showSystemUi = true)
