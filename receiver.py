@@ -1,13 +1,20 @@
 import socket
 from evdev import UInput, ecodes as e
 
+# ‼️ 1. Update capabilities to include letters
 cap = {
     e.EV_KEY: [
+        # Media Keys
         e.KEY_NEXTSONG, 
         e.KEY_PREVIOUSSONG, 
         e.KEY_VOLUMEUP, 
         e.KEY_VOLUMEDOWN,
-        e.KEY_PLAYPAUSE # Added just in case you want to map the button to this later
+        e.KEY_PLAYPAUSE,
+        # VIM Navigation Keys
+        e.KEY_H,
+        e.KEY_J,
+        e.KEY_K,
+        e.KEY_L
     ]
 }
 
@@ -18,17 +25,17 @@ PORT = 5001
 
 def press_key(key_code):
     """Helper to press and release a key instantly"""
-    ui.write(e.EV_KEY, key_code, 1)  # Press (1)
-    ui.syn()                         # Sync
-    ui.write(e.EV_KEY, key_code, 0)  # Release (0)
-    ui.syn()                         # Sync
+    ui.write(e.EV_KEY, key_code, 1)  # Press
+    ui.syn()
+    ui.write(e.EV_KEY, key_code, 0)  # Release
+    ui.syn()
 
 def start_server():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((HOST, PORT))
         s.listen()
         print(f"Server listening on {HOST}:{PORT}...")
-        print("‼️ Note: Ensure you are running this script with SUDO privileges for uinput access.")
+        print("Note: Ensure you are running this script with SUDO privileges.")
         
         while True:
             try:
@@ -43,29 +50,27 @@ def start_server():
                         message = data.decode('utf-8').strip()
                         print(f"Received: {message}")
 
+                        # Existing Swipe Logic
                         if message == "Swipe Left":
-                            print(">> Triggering: PREVIOUS SONG")
                             press_key(e.KEY_PREVIOUSSONG)
-                        
                         elif message == "Swipe Right":
-                            print(">> Triggering: NEXT SONG")
                             press_key(e.KEY_NEXTSONG)
-                        
                         elif message == "Swipe Up":
-                            print(">> Triggering: VOLUME UP")
                             press_key(e.KEY_VOLUMEUP)
-                        
                         elif message == "Swipe Down":
-                            print(">> Triggering: VOLUME DOWN")
                             press_key(e.KEY_VOLUMEDOWN)
-                            
-                        elif message == "Button Pressed":
-                            print(">> Triggering: PLAY/PAUSE")
-                            press_key(e.KEY_PLAYPAUSE)
+                        
+                        elif message == "h":
+                            press_key(e.KEY_H)
+                        elif message == "j":
+                            press_key(e.KEY_J)
+                        elif message == "k":
+                            press_key(e.KEY_K)
+                        elif message == "l":
+                            press_key(e.KEY_L)
 
             except Exception as ex:
                 print(f"Error: {ex}")
-                # Re-initialize or continue listening logic could go here
                 pass
 
 if __name__ == "__main__":
