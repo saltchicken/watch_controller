@@ -17,22 +17,24 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
-import androidx.wear.tooling.preview.devices.WearDevices
 import com.example.watchtestapp.presentation.theme.WatchTestAppTheme
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.PrintWriter
 import java.net.Socket
@@ -46,24 +48,22 @@ class MainActivity : ComponentActivity() {
             WearApp()
         }
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        SocketClient.close()
+    }
 }
 
 @Composable
 fun WearApp() {
     WatchTestAppTheme {
-        val coroutineScope = rememberCoroutineScope()
+        LaunchedEffect(Unit) {
+            SocketClient.init(this)
+        }
 
         fun sendToPython(message: String) {
-            coroutineScope.launch(Dispatchers.IO) {
-                try {
-                    val socket = Socket("10.0.0.19", 5001)
-                    val output = PrintWriter(socket.getOutputStream(), true)
-                    output.println(message)
-                    socket.close()
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
+            SocketClient.send(message)
         }
 
         Box(
@@ -91,6 +91,7 @@ fun WearApp() {
                 },
             contentAlignment = Alignment.Center
         ) {
+            // ... (Rest of your UI code remains exactly the same) ...
             // 1. UP ZONE (K)
             InvisibleTouchArea(
                 text = "",
@@ -101,7 +102,6 @@ fun WearApp() {
                     .height(80.dp),
                 shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
             )
-
             // 2. DOWN ZONE (J)
             InvisibleTouchArea(
                 text = "",
@@ -112,7 +112,6 @@ fun WearApp() {
                     .height(80.dp),
                 shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
             )
-
             // 3. LEFT ZONE (H)
             InvisibleTouchArea(
                 text = "",
@@ -123,7 +122,6 @@ fun WearApp() {
                     .fillMaxHeight(0.5f),
                 shape = RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp)
             )
-
             // 4. RIGHT ZONE (L)
             InvisibleTouchArea(
                 text = "",
@@ -134,7 +132,6 @@ fun WearApp() {
                     .fillMaxHeight(0.5f),
                 shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp)
             )
-
             // 5. MIDDLE ZONE (Action)
             InvisibleTouchArea(
                 text = "",
@@ -144,7 +141,6 @@ fun WearApp() {
                     .align(Alignment.Center),
                 shape = CircleShape
             )
-
             Text("", color = Color.Gray, style = MaterialTheme.typography.caption2)
         }
     }
@@ -158,7 +154,6 @@ fun InvisibleTouchArea(
     shape: Shape
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-
     Box(
         modifier = modifier
             .clip(shape)
@@ -167,7 +162,6 @@ fun InvisibleTouchArea(
                 indication = null,
                 onClick = onClick
             )
-            // Debug Color: Set alpha to 0.0f to hide completely
             .background(Color.White.copy(alpha = 0.1f)),
         contentAlignment = Alignment.Center
     ) {
@@ -175,8 +169,44 @@ fun InvisibleTouchArea(
     }
 }
 
-@Preview(device = WearDevices.SMALL_ROUND, showSystemUi = true)
-@Composable
-fun DefaultPreview() {
-    WearApp()
+
+object SocketClient {
+    private const val IP = "10.0.0.19"
+    private const val PORT = 5001
+
+    // A channel acts like a queue. We put messages in, the background thread pulls them out.
+    private val channel = Channel<String>(Channel.UNLIMITED)
+    private var job: kotlinx.coroutines.Job? = null
+
+    fun init(scope: CoroutineScope) {
+        if (job?.isActive == true) return // Already running
+
+        job = scope.launch(Dispatchers.IO) {
+            while (isActive) {
+                try {
+                    // 1. Open connection once
+                    val socket = Socket(IP, PORT)
+                    val output = PrintWriter(socket.getOutputStream(), true)
+
+                    // 2. Keep sending messages from the queue until error
+                    for (msg in channel) {
+                        output.println(msg)
+                        if (output.checkError()) throw Exception("Connection Broken")
+                    }
+                } catch (e: Exception) {
+                    // 3. If connection fails, wait 1s and try to reconnect
+                    e.printStackTrace()
+                    delay(1000)
+                }
+            }
+        }
+    }
+
+    fun send(msg: String) {
+        channel.trySend(msg)
+    }
+
+    fun close() {
+        job?.cancel()
+    }
 }
