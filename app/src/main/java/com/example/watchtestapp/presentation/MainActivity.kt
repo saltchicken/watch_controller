@@ -298,10 +298,10 @@ suspend fun streamAudio(shouldRecord: () -> Boolean) {
                 minBufSize
             )
 
-            if (recorder.state != AudioRecord.STATE_INITIALIZED) {
-                // If we land here, likely permission denied or hardware in use
-                return@withContext
-            }
+            if (recorder.state != AudioRecord.STATE_INITIALIZED) return@withContext
+
+            // ‼️ 1. Send Start Signal
+            SocketClient.send("AUDIO_START")
 
             recorder.startRecording()
             while (shouldRecord()) {
@@ -320,6 +320,8 @@ suspend fun streamAudio(shouldRecord: () -> Boolean) {
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+            // ‼️ 2. Send End Signal (Always runs when loop finishes)
+            SocketClient.send("AUDIO_END")
         }
     }
 }
