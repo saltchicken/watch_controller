@@ -4,9 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,7 +17,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -91,56 +89,60 @@ fun WearApp() {
                 },
             contentAlignment = Alignment.Center
         ) {
-            // ... (Rest of your UI code remains exactly the same) ...
             // 1. UP ZONE (K)
             InvisibleTouchArea(
-                text = "",
-                onClick = { sendToPython("k") },
+                command = "k",
+                sendToPython = ::sendToPython,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth(0.6f)
                     .height(80.dp),
                 shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
             )
+
             // 2. DOWN ZONE (J)
             InvisibleTouchArea(
-                text = "",
-                onClick = { sendToPython("j") },
+                command = "j",
+                sendToPython = ::sendToPython,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth(0.6f)
                     .height(80.dp),
                 shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
             )
+
             // 3. LEFT ZONE (H)
             InvisibleTouchArea(
-                text = "",
-                onClick = { sendToPython("h") },
+                command = "h",
+                sendToPython = ::sendToPython,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .width(70.dp)
                     .fillMaxHeight(0.5f),
                 shape = RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp)
             )
+
             // 4. RIGHT ZONE (L)
             InvisibleTouchArea(
-                text = "",
-                onClick = { sendToPython("l") },
+                command = "l",
+                sendToPython = ::sendToPython,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .width(70.dp)
                     .fillMaxHeight(0.5f),
                 shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp)
             )
+
             // 5. MIDDLE ZONE (Action)
             InvisibleTouchArea(
-                text = "",
-                onClick = { sendToPython("Button Pressed") },
+                command = "Button Pressed",
+                sendToPython = ::sendToPython,
                 modifier = Modifier
                     .size(80.dp)
                     .align(Alignment.Center),
                 shape = CircleShape
             )
+
             Text("", color = Color.Gray, style = MaterialTheme.typography.caption2)
         }
     }
@@ -148,53 +150,46 @@ fun WearApp() {
 
 @Composable
 fun InvisibleTouchArea(
-    text: String,
-    onClick: () -> Unit,
+    command: String,
+    sendToPython: (String) -> Unit,
     modifier: Modifier = Modifier,
     shape: Shape
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
             .clip(shape)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            )
+            .pointerInput(command) {
+                detectTapGestures(
+                    onPress = {
+                        sendToPython(command)
+                    }
+                )
+            }
             .background(Color.White.copy(alpha = 0.1f)),
         contentAlignment = Alignment.Center
     ) {
-        Text(text = text, color = Color.White.copy(alpha = 0.3f))
+        Text(text = "", color = Color.White.copy(alpha = 0.3f))
     }
 }
-
 
 object SocketClient {
     private const val IP = "10.0.0.19"
     private const val PORT = 5001
-
-    // A channel acts like a queue. We put messages in, the background thread pulls them out.
     private val channel = Channel<String>(Channel.UNLIMITED)
     private var job: kotlinx.coroutines.Job? = null
 
     fun init(scope: CoroutineScope) {
-        if (job?.isActive == true) return // Already running
-
+        if (job?.isActive == true) return
         job = scope.launch(Dispatchers.IO) {
             while (isActive) {
                 try {
-                    // 1. Open connection once
                     val socket = Socket(IP, PORT)
                     val output = PrintWriter(socket.getOutputStream(), true)
-
-                    // 2. Keep sending messages from the queue until error
                     for (msg in channel) {
                         output.println(msg)
                         if (output.checkError()) throw Exception("Connection Broken")
                     }
                 } catch (e: Exception) {
-                    // 3. If connection fails, wait 1s and try to reconnect
                     e.printStackTrace()
                     delay(1000)
                 }
