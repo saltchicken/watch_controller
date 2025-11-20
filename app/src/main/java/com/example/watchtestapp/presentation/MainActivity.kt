@@ -6,7 +6,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-// ‼️ Added imports for InteractionSource (needed to fix the crash)
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -58,7 +57,6 @@ fun WearApp(greetingName: String) {
         fun sendToPython(message: String) {
             coroutineScope.launch(Dispatchers.IO) {
                 try {
-                    // ‼️ Check your IP
                     val socket = Socket("10.0.0.19", 5001)
                     val output = PrintWriter(socket.getOutputStream(), true)
                     output.println(message)
@@ -160,13 +158,11 @@ fun InvisibleTouchArea(
     modifier: Modifier = Modifier,
     shape: Shape
 ) {
-    // ‼️ CRITICAL FIX: Create an interaction source
     val interactionSource = remember { MutableInteractionSource() }
 
     Box(
         modifier = modifier
             .clip(shape)
-            // ‼️ FIX: Explicitly set indication to null to bypass the crash
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
