@@ -1,8 +1,17 @@
 package com.example.watchtestapp.presentation
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.pm.PackageManager
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.os.Bundle
+import android.util.Base64
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -15,15 +24,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
@@ -34,6 +44,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.PrintWriter
 import java.net.Socket
 import kotlin.math.abs
@@ -62,6 +73,40 @@ fun WearApp() {
 
         fun sendToPython(message: String) {
             SocketClient.send(message)
+        }
+
+        // ‼️ 1. PERMISSION LOGIC START
+        val context = LocalContext.current
+        var hasPermission by remember {
+            mutableStateOf(
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.RECORD_AUDIO
+                ) == PackageManager.PERMISSION_GRANTED
+            )
+        }
+
+        val launcher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+            onResult = { isGranted -> hasPermission = isGranted }
+        )
+
+        // Ask for permission immediately when app opens
+        LaunchedEffect(Unit) {
+            if (!hasPermission) {
+                launcher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+        // ‼️ PERMISSION LOGIC END
+
+        // State to track if we are currently recording
+        var isRecording by remember { mutableStateOf(false) }
+
+        // Background effect that streams audio while isRecording is true
+        LaunchedEffect(isRecording) {
+            if (isRecording && hasPermission) {
+                streamAudio(shouldRecord = { isRecording })
+            }
         }
 
         Box(
@@ -133,15 +178,42 @@ fun WearApp() {
                 shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp)
             )
 
-            // 5. MIDDLE ZONE (Action)
-            InvisibleTouchArea(
-                command = "Button Pressed",
-                sendToPython = ::sendToPython,
+            // 5. MIDDLE ZONE (PUSH TO TALK)
+            Box(
                 modifier = Modifier
                     .size(80.dp)
-                    .align(Alignment.Center),
-                shape = CircleShape
-            )
+                    .align(Alignment.Center)
+                    .clip(CircleShape)
+                    // Visual feedback: Red = Recording, Gray = No Permission, White/Clear = Ready
+                    .background(
+                        when {
+                            isRecording -> Color.Red.copy(alpha = 0.6f)
+                            !hasPermission -> Color.Gray.copy(alpha = 0.3f)
+                            else -> Color.White.copy(alpha = 0.1f)
+                        }
+                    )
+                    .pointerInput(hasPermission) {
+                        if (hasPermission) {
+                            detectTapGestures(
+                                onPress = {
+                                    isRecording = true
+                                    tryAwaitRelease()
+                                    isRecording = false
+                                }
+                            )
+                        } else {
+                            // If they tap without permission, ask again
+                            detectTapGestures(onTap = { launcher.launch(Manifest.permission.RECORD_AUDIO) })
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (isRecording) "MIC ON" else if (!hasPermission) "PERM?" else "",
+                    color = Color.White,
+                    style = MaterialTheme.typography.caption2
+                )
+            }
 
             Text("", color = Color.Gray, style = MaterialTheme.typography.caption2)
         }
@@ -203,5 +275,51 @@ object SocketClient {
 
     fun close() {
         job?.cancel()
+    }
+}
+
+@SuppressLint("MissingPermission")
+suspend fun streamAudio(shouldRecord: () -> Boolean) {
+    withContext(Dispatchers.IO) {
+        val sampleRate = 16000
+        val channelConfig = AudioFormat.CHANNEL_IN_MONO
+        val audioFormat = AudioFormat.ENCODING_PCM_16BIT
+        val minBufSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
+        val buffer = ByteArray(minBufSize)
+
+        var recorder: AudioRecord? = null
+
+        try {
+            recorder = AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                sampleRate,
+                channelConfig,
+                audioFormat,
+                minBufSize
+            )
+
+            if (recorder.state != AudioRecord.STATE_INITIALIZED) {
+                // If we land here, likely permission denied or hardware in use
+                return@withContext
+            }
+
+            recorder.startRecording()
+            while (shouldRecord()) {
+                val readCount = recorder.read(buffer, 0, minBufSize)
+                if (readCount > 0) {
+                    val base64Audio = Base64.encodeToString(buffer, 0, readCount, Base64.NO_WRAP)
+                    SocketClient.send("AUDIO:$base64Audio")
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            try {
+                recorder?.stop()
+                recorder?.release()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 }
