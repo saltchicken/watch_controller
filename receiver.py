@@ -4,6 +4,7 @@ import time
 import io
 import threading
 import queue
+import numpy as np
 from evdev import UInput, ecodes as e
 from faster_whisper import WhisperModel
 
@@ -34,6 +35,15 @@ audio_queue = queue.Queue()
 print(" >> Loading Whisper Model (tiny.en)...")
 model = WhisperModel("tiny.en", device="cuda", compute_type="int8")
 print(" >> Model Loaded.")
+
+print(" >> Warming up model...")
+# Create 1 second of silence (16kHz sample rate)
+dummy_audio = np.zeros(16000, dtype=np.float32) 
+# Force a transcription run
+segments, _ = model.transcribe(dummy_audio, beam_size=5)
+# Consume the generator to ensure execution happens now
+list(segments) 
+print(" >> Model Warm & Ready!")
 
 def press_key(key_code):
     if ui:
