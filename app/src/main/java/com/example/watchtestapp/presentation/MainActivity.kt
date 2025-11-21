@@ -6,10 +6,10 @@ import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
-import android.os.Build // ‼️ Added for version check
+import android.os.Build
 import android.os.Bundle
-import android.os.VibrationEffect // ‼️ Added for haptic constants
-import android.os.Vibrator // ‼️ Added for haptic service
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -92,9 +92,7 @@ fun WearApp() {
                 }
             }
         }
-        // ‼️ HAPTIC FEEDBACK SETUP END
 
-        // ‼️ 1. PERMISSION LOGIC START
         var hasPermission by remember {
             mutableStateOf(
                 ContextCompat.checkSelfPermission(
@@ -115,7 +113,6 @@ fun WearApp() {
                 launcher.launch(Manifest.permission.RECORD_AUDIO)
             }
         }
-        // ‼️ PERMISSION LOGIC END
 
         // State to track if we are currently recording
         var isRecording by remember { mutableStateOf(false) }
@@ -137,7 +134,6 @@ fun WearApp() {
                     detectDragGestures(
                         onDragStart = { offsetX = 0f; offsetY = 0f },
                         onDragEnd = {
-                            // ‼️ Trigger haptic on swipe completion
                             triggerHaptic(VibrationEffect.EFFECT_CLICK)
 
                             if (abs(offsetX) > abs(offsetY)) {
@@ -159,7 +155,7 @@ fun WearApp() {
             InvisibleTouchArea(
                 command = "k",
                 sendToPython = ::sendToPython,
-                onInteract = { triggerHaptic() }, // ‼️ Pass haptic trigger
+                onInteract = { triggerHaptic() },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth(0.6f)
@@ -171,7 +167,7 @@ fun WearApp() {
             InvisibleTouchArea(
                 command = "j",
                 sendToPython = ::sendToPython,
-                onInteract = { triggerHaptic() }, // ‼️ Pass haptic trigger
+                onInteract = { triggerHaptic() },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth(0.6f)
@@ -183,7 +179,7 @@ fun WearApp() {
             InvisibleTouchArea(
                 command = "h",
                 sendToPython = ::sendToPython,
-                onInteract = { triggerHaptic() }, // ‼️ Pass haptic trigger
+                onInteract = { triggerHaptic() },
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .width(70.dp)
@@ -195,7 +191,7 @@ fun WearApp() {
             InvisibleTouchArea(
                 command = "l",
                 sendToPython = ::sendToPython,
-                onInteract = { triggerHaptic() }, // ‼️ Pass haptic trigger
+                onInteract = { triggerHaptic() },
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .width(70.dp)
@@ -221,14 +217,12 @@ fun WearApp() {
                         if (hasPermission) {
                             detectTapGestures(
                                 onPress = {
-                                    // ‼️ Haptic on press start
                                     triggerHaptic(VibrationEffect.EFFECT_CLICK)
 
                                     isRecording = true
                                     tryAwaitRelease()
                                     isRecording = false
 
-                                    // ‼️ Haptic on press release
                                     triggerHaptic(VibrationEffect.EFFECT_TICK)
                                 }
                             )
@@ -254,7 +248,7 @@ fun WearApp() {
 fun InvisibleTouchArea(
     command: String,
     sendToPython: (String) -> Unit,
-    onInteract: () -> Unit, // ‼️ Added callback parameter
+    onInteract: () -> Unit,
     modifier: Modifier = Modifier,
     shape: Shape
 ) {
@@ -264,7 +258,7 @@ fun InvisibleTouchArea(
             .pointerInput(command) {
                 detectTapGestures(
                     onPress = {
-                        onInteract() // ‼️ Trigger callback
+                        onInteract()
                         sendToPython(command)
                     }
                 )
@@ -330,7 +324,6 @@ suspend fun streamAudio(shouldRecord: () -> Boolean) {
             )
             if (recorder.state != AudioRecord.STATE_INITIALIZED) return@withContext
 
-            // ‼️ 1. Send Start Signal
             SocketClient.send("AUDIO_START")
 
             recorder.startRecording()
@@ -350,7 +343,6 @@ suspend fun streamAudio(shouldRecord: () -> Boolean) {
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-            // ‼️ 2. Send End Signal (Always runs when loop finishes)
             SocketClient.send("AUDIO_END")
         }
     }
