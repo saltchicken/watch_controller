@@ -31,9 +31,10 @@ PORT = 5001
 current_audio_buffer = bytearray()
 
 audio_queue = queue.Queue()
+whisper_model = "medium.en"
 
-print(" >> Loading Whisper Model (tiny.en)...")
-model = WhisperModel("tiny.en", device="cuda", compute_type="int8")
+print(f" >> Loading Whisper Model ({whisper_model})...")
+model = WhisperModel(whisper_model, device="cuda", compute_type="int8")
 print(" >> Model Loaded.")
 
 print(" >> Warming up model...")
