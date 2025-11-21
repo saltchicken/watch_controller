@@ -273,8 +273,15 @@ fun InvisibleTouchArea(
 object SocketClient {
     private const val IP = "10.0.0.19"
     private const val PORT = 5001
-    private val channel = Channel<String>(Channel.UNLIMITED)
+    
+    private val channel = Channel<String>(
+        capacity = 64,
+        onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST
+    )
+
     private var job: kotlinx.coroutines.Job? = null
+
+    @Volatile private var isConnected = false
 
     fun init(scope: CoroutineScope) {
         if (job?.isActive == true) return
@@ -283,23 +290,32 @@ object SocketClient {
                 try {
                     val socket = Socket(IP, PORT)
                     val output = PrintWriter(socket.getOutputStream(), true)
+
+                    isConnected = true
+
                     for (msg in channel) {
                         output.println(msg)
                         if (output.checkError()) throw Exception("Connection Broken")
                     }
                 } catch (e: Exception) {
+                    isConnected = false
                     e.printStackTrace()
                     delay(1000)
+                } finally {
+                    isConnected = false
                 }
             }
         }
     }
 
     fun send(msg: String) {
-        channel.trySend(msg)
+        if (isConnected) {
+            channel.trySend(msg)
+        }
     }
 
     fun close() {
+        isConnected = false
         job?.cancel()
     }
 }
