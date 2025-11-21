@@ -7,7 +7,6 @@ import queue
 from evdev import UInput, ecodes as e
 from faster_whisper import WhisperModel
 
-# Input Setup (Perfect for Hyprland/Wayland)
 cap = {
     e.EV_KEY: [
         e.KEY_NEXTSONG, 
@@ -63,16 +62,16 @@ def transcription_worker():
             virtual_file.seek(0)
 
             segments, _ = model.transcribe(virtual_file, beam_size=5)
-            
+
             full_text = ""
             for segment in segments:
                 full_text += segment.text + " "
-                
+
             print(f" >> TRANSCRIPT: {full_text.strip()} ({time.time() - start:.2f}s)")
 
             cmd = full_text.lower().strip()
             if "enter" in cmd: press_key(e.KEY_ENTER)
-            
+
         except Exception as e:
             print(f"Transcription Error: {e}")
         finally:
@@ -80,7 +79,7 @@ def transcription_worker():
 
 def start_server():
     global current_audio_buffer
-    
+
     t = threading.Thread(target=transcription_worker, daemon=True)
     t.start()
 
@@ -89,7 +88,7 @@ def start_server():
         s.bind((HOST, PORT))
         s.listen()
         print(f"Server listening on {HOST}:{PORT}...")
-        
+
         while True:
             try:
                 conn, addr = s.accept()
@@ -100,29 +99,29 @@ def start_server():
                         data = conn.recv(4096)
                         if not data: break
                         buffer += data.decode('utf-8')
-                        
+
                         while '\n' in buffer:
                             message, buffer = buffer.split('\n', 1)
                             message = message.strip()
                             if not message: continue
-                            
+
                             if message == "AUDIO_START":
                                 print(" >> Incoming Audio Stream...")
                                 current_audio_buffer = bytearray()
-                                
+
                             elif message == "AUDIO_END":
                                 print(" >> Audio End. Queuing.")
-                                # ‼️ Changed: Send to thread instead of blocking
+
                                 if len(current_audio_buffer) > 0:
                                     audio_queue.put(current_audio_buffer)
                                 current_audio_buffer = bytearray()
-                                
+
                             elif message.startswith("AUDIO:"):
                                 try:
                                     b64_data = message.replace("AUDIO:", "")
                                     current_audio_buffer.extend(base64.b64decode(b64_data))
                                 except: pass
-                                
+
                             else:
                                 key_map = {
                                     "Swipe Left": e.KEY_PREVIOUSSONG,
