@@ -1,9 +1,9 @@
 import socket
 import base64
 import time
-import io # ‼️ Changed: Added for in-memory audio
-import threading # ‼️ Changed: Added for non-blocking transcription
-import queue # ‼️ Changed: Added for thread safety
+import io
+import threading
+import queue
 from evdev import UInput, ecodes as e
 from faster_whisper import WhisperModel
 
@@ -16,7 +16,7 @@ cap = {
         e.KEY_VOLUMEDOWN,
         e.KEY_PLAYPAUSE,
         e.KEY_H, e.KEY_J, e.KEY_K, e.KEY_L,
-        e.KEY_ENTER, e.KEY_BACKSPACE # ‼️ Added useful extra keys
+        e.KEY_ENTER, e.KEY_BACKSPACE
     ]
 }
 
@@ -30,35 +30,29 @@ HOST = '0.0.0.0'
 PORT = 5001
 current_audio_buffer = bytearray()
 
-# ‼️ Changed: Queue to pass audio from Socket Thread to Whisper Thread
 audio_queue = queue.Queue()
 
 print(" >> Loading Whisper Model (tiny.en)...")
-# ‼️ Check: Ensure you have CUDA drivers on CachyOS, otherwise swap to "cpu"
-model = WhisperModel("tiny.en", device="cpu", compute_type="int8")
+model = WhisperModel("tiny.en", device="cuda", compute_type="int8")
 print(" >> Model Loaded.")
 
 def press_key(key_code):
     if ui:
         ui.write(e.EV_KEY, key_code, 1)
         ui.syn()
-        time.sleep(0.01) # ‼️ Added tiny sleep for stability
+        time.sleep(0.01)
         ui.write(e.EV_KEY, key_code, 0)
         ui.syn()
 
-# ‼️ New Function: Runs in background thread
 def transcription_worker():
     while True:
         audio_data = audio_queue.get()
         if audio_data is None: break # Poison pill to stop thread
-        
+
         try:
             print(f" >> Processing {len(audio_data)} bytes...")
             start = time.time()
-            
-            # ‼️ Changed: Convert raw PCM (16-bit, 16kHz Mono) to float32 for Whisper
-            # Note: fast-whisper usually handles file-like objects. 
-            # If raw bytes fail, we wrap in BytesIO imitating a WAV file is safer:
+
             import wave
             virtual_file = io.BytesIO()
             with wave.open(virtual_file, 'wb') as wf:
@@ -75,8 +69,7 @@ def transcription_worker():
                 full_text += segment.text + " "
                 
             print(f" >> TRANSCRIPT: {full_text.strip()} ({time.time() - start:.2f}s)")
-            
-            # ‼️ Logic: Map voice commands to Hyprland/App actions here
+
             cmd = full_text.lower().strip()
             if "enter" in cmd: press_key(e.KEY_ENTER)
             
@@ -88,7 +81,6 @@ def transcription_worker():
 def start_server():
     global current_audio_buffer
     
-    # ‼️ Start the background worker
     t = threading.Thread(target=transcription_worker, daemon=True)
     t.start()
 
@@ -131,7 +123,6 @@ def start_server():
                                     current_audio_buffer.extend(base64.b64decode(b64_data))
                                 except: pass
                                 
-                            # ‼️ Optimized: Dictionary mapping for cleaner code
                             else:
                                 key_map = {
                                     "Swipe Left": e.KEY_PREVIOUSSONG,
