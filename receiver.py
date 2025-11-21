@@ -80,8 +80,8 @@ def transcription_worker():
 
             print(f" >> TRANSCRIPT: {full_text.strip()} ({time.time() - start:.2f}s)")
 
-            cmd = full_text.lower().strip()
-            if "enter" in cmd: press_key(e.KEY_ENTER)
+            # cmd = full_text.lower().strip()
+            # if "enter" in cmd: press_key(e.KEY_ENTER)
 
         except Exception as e:
             print(f"Transcription Error: {e}")
