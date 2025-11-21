@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.util.Base64
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -35,6 +36,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -56,6 +60,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         setContent {
             WearApp()
         }
@@ -74,11 +81,25 @@ fun WearApp() {
             SocketClient.init(this)
         }
 
+        // LIFECYCLE OBSERVER TO DETECT REOPENING
+        val lifecycleOwner = LocalLifecycleOwner.current
+        DisposableEffect(lifecycleOwner) {
+            val observer = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    SocketClient.send("WATCH_CONNECTED")
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+            }
+        }
+
         fun sendToPython(message: String) {
             SocketClient.send(message)
         }
 
-        // ‼️ HAPTIC FEEDBACK SETUP START
+        // HAPTIC FEEDBACK SETUP START
         val context = LocalContext.current
         val vibrator = remember { context.getSystemService(Vibrator::class.java) }
 
@@ -135,7 +156,6 @@ fun WearApp() {
                         onDragStart = { offsetX = 0f; offsetY = 0f },
                         onDragEnd = {
                             triggerHaptic(VibrationEffect.EFFECT_CLICK)
-
                             if (abs(offsetX) > abs(offsetY)) {
                                 if (offsetX > 0) sendToPython("Swipe Right") else sendToPython("Swipe Left")
                             } else {
@@ -205,7 +225,6 @@ fun WearApp() {
                     .size(80.dp)
                     .align(Alignment.Center)
                     .clip(CircleShape)
-                    // Visual feedback: Red = Recording, Gray = No Permission, White/Clear = Ready
                     .background(
                         when {
                             isRecording -> Color.Red.copy(alpha = 0.6f)
@@ -218,16 +237,13 @@ fun WearApp() {
                             detectTapGestures(
                                 onPress = {
                                     triggerHaptic(VibrationEffect.EFFECT_CLICK)
-
                                     isRecording = true
                                     tryAwaitRelease()
                                     isRecording = false
-
                                     triggerHaptic(VibrationEffect.EFFECT_TICK)
                                 }
                             )
                         } else {
-                            // If they tap without permission, ask again
                             detectTapGestures(onTap = { launcher.launch(Manifest.permission.RECORD_AUDIO) })
                         }
                     },
@@ -273,14 +289,12 @@ fun InvisibleTouchArea(
 object SocketClient {
     private const val IP = "10.0.0.19"
     private const val PORT = 5001
-    
+
     private val channel = Channel<String>(
         capacity = 64,
         onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST
     )
-
     private var job: kotlinx.coroutines.Job? = null
-
     @Volatile private var isConnected = false
 
     fun init(scope: CoroutineScope) {
@@ -290,7 +304,6 @@ object SocketClient {
                 try {
                     val socket = Socket(IP, PORT)
                     val output = PrintWriter(socket.getOutputStream(), true)
-
                     isConnected = true
 
                     output.println("WATCH_CONNECTED")
@@ -330,6 +343,7 @@ suspend fun streamAudio(shouldRecord: () -> Boolean) {
         val channelConfig = AudioFormat.CHANNEL_IN_MONO
         val audioFormat = AudioFormat.ENCODING_PCM_16BIT
         val minBufSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
+
         val buffer = ByteArray(minBufSize)
         var recorder: AudioRecord? = null
 
@@ -341,11 +355,12 @@ suspend fun streamAudio(shouldRecord: () -> Boolean) {
                 audioFormat,
                 minBufSize
             )
+
             if (recorder.state != AudioRecord.STATE_INITIALIZED) return@withContext
 
             SocketClient.send("AUDIO_START")
-
             recorder.startRecording()
+
             while (shouldRecord()) {
                 val readCount = recorder.read(buffer, 0, minBufSize)
                 if (readCount > 0) {
