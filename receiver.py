@@ -127,6 +127,9 @@ def start_server():
                                     audio_queue.put(current_audio_buffer)
                                 current_audio_buffer = bytearray()
 
+                            elif message == "WATCH_CONNECTED":
+                                print(" >> Watch Automatically Connected!")
+
                             elif message.startswith("AUDIO:"):
                                 try:
                                     b64_data = message.replace("AUDIO:", "")

@@ -293,6 +293,9 @@ object SocketClient {
 
                     isConnected = true
 
+                    output.println("WATCH_CONNECTED")
+                    if (output.checkError()) throw Exception("Handshake Failed")
+
                     for (msg in channel) {
                         output.println(msg)
                         if (output.checkError()) throw Exception("Connection Broken")
