@@ -7,12 +7,12 @@ import queue
 import numpy as np
 from faster_whisper import WhisperModel
 
-# ‼️ REMOVED: evdev/UInput (Server no longer presses keys)
+
 
 HOST = "0.0.0.0"
 PORT = 5001
 
-# ‼️ NEW: Global variable to hold the socket of the execution client
+
 client_connection = None
 
 audio_queue = queue.Queue()
@@ -29,7 +29,7 @@ list(segments)
 print(" >> Model Ready!")
 
 
-# ‼️ NEW: Function to send commands to the designated Client
+
 def send_to_client(command):
     global client_connection
     if client_connection:
@@ -70,7 +70,7 @@ def transcription_worker():
 
             print(f" >> TRANSCRIPT: {full_text} ({time.time() - start:.2f}s)")
 
-            # ‼️ NEW: Instead of pressing keys, forward text to client
+
             if full_text:
                 send_to_client(full_text)
 
@@ -80,7 +80,7 @@ def transcription_worker():
             audio_queue.task_done()
 
 
-# ‼️ NEW: Specialized handler for the Watch Connection
+
 def handle_watch_connection(conn):
     print(" >> Handling WATCH connection")
     current_audio_buffer = bytearray()
@@ -116,7 +116,7 @@ def handle_watch_connection(conn):
                         except:
                             pass
 
-                    # ‼️ NEW: If it's not audio, it's a gesture (Swipe Left, etc). Forward it!
+
                     elif message != "WATCH_CONNECTED":
                         send_to_client(message)
             except Exception as e:
@@ -125,7 +125,7 @@ def handle_watch_connection(conn):
     print(" >> Watch Disconnected")
 
 
-# ‼️ NEW: Specialized handler for the Client Connection
+
 def handle_client_connection(conn):
     global client_connection
     print(" >> CLIENT REGISTERED. Ready to send commands.")
@@ -161,7 +161,7 @@ def start_server():
                 conn, addr = s.accept()
                 print(f"Incoming connection from {addr}...")
 
-                # ‼️ NEW: Handshake Logic
+
                 # We peek at the first message to see WHO is connecting
                 conn.settimeout(5)  # Give them 5 seconds to identify
                 try:

