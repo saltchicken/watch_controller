@@ -287,7 +287,7 @@ fun InvisibleTouchArea(
 }
 
 object SocketClient {
-    private const val IP = "10.0.0.19"
+    private const val IP = "10.0.0.3"
     private const val PORT = 5001
 
     private val channel = Channel<String>(
