@@ -23,3 +23,7 @@ adb pair 10.0.0.15:41039
 adb connect 10.0.0.15:42221
 adb uninstall com.example.watchtestapp
 gradle installDebug
+
+
+may need to run
+sudo ufw allow 5001/tcp
