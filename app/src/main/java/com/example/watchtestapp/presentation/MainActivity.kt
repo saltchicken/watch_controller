@@ -173,7 +173,7 @@ fun InvisibleTouchArea(
 }
 
 object SocketClient {
-    private const val IP = "10.0.0.19"
+    private const val IP = "10.0.0.22"
     private const val PORT = 5001
     private val channel = Channel<String>(Channel.UNLIMITED)
     private var job: kotlinx.coroutines.Job? = null
