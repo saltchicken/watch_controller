@@ -17,7 +17,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -54,7 +53,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.PrintWriter
 import java.net.Socket
-import kotlin.math.abs
+// ‼️ Removed: import kotlin.math.abs
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -148,27 +147,7 @@ fun WearApp() {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black)
-                .pointerInput(Unit) {
-                    var offsetX = 0f
-                    var offsetY = 0f
-                    detectDragGestures(
-                        onDragStart = { offsetX = 0f; offsetY = 0f },
-                        onDragEnd = {
-                            triggerHaptic(VibrationEffect.EFFECT_CLICK)
-                            if (abs(offsetX) > abs(offsetY)) {
-                                if (offsetX > 0) sendToPython("Swipe Right") else sendToPython("Swipe Left")
-                            } else {
-                                if (offsetY > 0) sendToPython("Swipe Down") else sendToPython("Swipe Up")
-                            }
-                        },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            offsetX += dragAmount.x
-                            offsetY += dragAmount.y
-                        }
-                    )
-                },
+                .background(Color.Black),
             contentAlignment = Alignment.Center
         ) {
             // 1. UP ZONE (K)
