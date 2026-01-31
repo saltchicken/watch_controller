@@ -6,12 +6,12 @@ import os
 import re
 import queue
 import threading
-import socket  # ‼️ Added socket import
+import socket
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-# ‼️ New class to handle sentence extraction from a continuous stream
+
 class StreamSentenceSplitter:
     def __init__(self):
         self.buffer = ""
@@ -41,7 +41,7 @@ class StreamSentenceSplitter:
         self.buffer = ""
         return [res] if res else []
 
-# ‼️ New class to manage the Gemini Connection
+
 class GeminiStreamer:
     def __init__(self):
         load_dotenv()
@@ -77,7 +77,7 @@ class GeminiStreamer:
         except Exception as e:
             print(f"\n‼️ Gemini Error: {e}")
 
-# ‼️ Completely refactored Audio Pipeline
+
 class AudioPipeline:
     def __init__(self, server_url, voice=None, temp=0.9):
         self.server_url = server_url
@@ -138,7 +138,7 @@ class AudioPipeline:
             }
 
             try:
-                # ‼️ Send request to server (streaming response)
+
                 with requests.post(self.server_url, json=payload, stream=True, timeout=30) as response:
                     if response.status_code != 200:
                         print(f"‼️ Server Error {response.status_code}")
@@ -197,7 +197,7 @@ class AudioPipeline:
                     # If we can't find header yet, keep buffering
                     continue
             else:
-                # ‼️ Crucial: For subsequent sentences, we might get a WAV header again 
+
                 # (because server treats each request as new). We must detect and strip it
                 # to avoid loud "pops" or static.
                 
@@ -233,7 +233,7 @@ class AudioPipeline:
         self.t_tts.join() # Wait for TTS to finish pending
         self.t_player.join() # Wait for player to finish pending
 
-# ‼️ Extracted logic to process a prompt so it can be called from the socket loop
+
 def process_prompt(prompt, gemini, splitter, pipeline):
     if not prompt: 
         return
@@ -241,7 +241,7 @@ def process_prompt(prompt, gemini, splitter, pipeline):
     print(f"\n>> ‼️ Processing Prompt: {prompt}")
     sys_prompt = "You are a conversational assistant. You give concise answers. Talk like you are having a normal conversation."
     
-    # ‼️ Stream Gemini -> Split -> Push to Pipeline
+
     for text_chunk in gemini.stream_text_generator(prompt, system_instruction=sys_prompt):
         print(text_chunk, end="", flush=True) # Print text as it arrives
         sentences = splitter.process_chunk(text_chunk)
@@ -274,7 +274,7 @@ if __name__ == "__main__":
     splitter = StreamSentenceSplitter()
 
     try:
-        # ‼️ Check if we are running manual mode or socket listener mode
+
         if args.manual and args.text:
             # Single shot mode (old behavior)
             process_prompt(args.text, gemini, splitter, pipeline)
@@ -282,14 +282,14 @@ if __name__ == "__main__":
             print(">> Done.")
             
         else:
-            # ‼️ New Socket Listener Mode
+
             receiver_addr = (args.receiver_host, args.receiver_port)
             print(f">> ‼️ Connecting to Receiver at {receiver_addr}...")
             
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 try:
                     s.connect(receiver_addr)
-                    s.sendall(b"CLIENT_CONNECTED") # ‼️ Handshake protocol matching receiver.py
+                    s.sendall(b"CLIENT_CONNECTED")
                     print(">> ‼️ Connected. Waiting for transcription CMDs...")
                     
                     buffer = ""

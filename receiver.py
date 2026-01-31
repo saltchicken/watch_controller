@@ -118,7 +118,11 @@ def handle_watch_connection(conn):
 
 
                     elif message != "WATCH_CONNECTED":
-                        send_to_client(message)
+
+                        # instead of sending them to the LLM Client.
+                        # Only audio transcriptions (from transcription_worker) are sent.
+                        print(f" >> Watch Input (Ignored): {message}")
+
             except Exception as e:
                 print(f"Watch Error: {e}")
                 break
